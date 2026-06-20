@@ -27,26 +27,41 @@ export function AuthProvider({ children }) {
 
   const resolveRoute = useCallback((userProfile) => {
     if (!userProfile) return '/'
-
     const { role, is_active } = userProfile
-
     if (role && !is_active) return '/deactivated'
     if (!role && !is_active) return '/pending'
-
     if (role && is_active && ROLE_DASHBOARDS[role]) {
       return ROLE_DASHBOARDS[role]
     }
-
     return '/'
   }, [])
 
   const handlePostSignIn = useCallback(
-    async (userId) => {
+    async (userId, userMeta) => {
       let userProfile = await fetchProfile(userId)
 
+      // If no row exists, create it manually
       if (!userProfile) {
-        await new Promise((r) => setTimeout(r, 500))
-        userProfile = await fetchProfile(userId)
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: userId,
+            email: userMeta?.email,
+            full_name: userMeta?.user_metadata?.full_name,
+            avatar_url: userMeta?.user_metadata?.avatar_url,
+            is_active: false,
+          })
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('Failed to create user row:', insertError.message)
+          // Try fetching again in case of race condition
+          await new Promise((r) => setTimeout(r, 1000))
+          userProfile = await fetchProfile(userId)
+        } else {
+          userProfile = newUser
+        }
       }
 
       if (!userProfile) return null
@@ -103,7 +118,7 @@ export function AuthProvider({ children }) {
 
       if (event === 'SIGNED_IN' && newSession?.user) {
         setLoading(true)
-        await handlePostSignIn(newSession.user.id)
+        await handlePostSignIn(newSession.user.id, newSession.user)
         setLoading(false)
       }
 
@@ -122,7 +137,7 @@ export function AuthProvider({ children }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: 'https://dev-crew-flame.vercel.app',
       },
     })
     if (error) throw error
