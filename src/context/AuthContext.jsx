@@ -1,0 +1,169 @@
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { leavePresence } from '../hooks/useOnlinePresence'
+import { ROLE_DASHBOARDS, SELECTED_ROLE_KEY, supabase } from '../services/supabase'
+
+const AuthContext = createContext(null)
+
+export function AuthProvider({ children }) {
+  const [session, setSession] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
+
+  const fetchProfile = useCallback(async (userId) => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (error) {
+      console.error('Failed to fetch profile:', error.message)
+      return null
+    }
+    return data
+  }, [])
+
+  const resolveRoute = useCallback((userProfile) => {
+    if (!userProfile) return '/'
+
+    const { role, is_active } = userProfile
+
+    if (role && !is_active) return '/deactivated'
+    if (!role && !is_active) return '/pending'
+
+    if (role && is_active && ROLE_DASHBOARDS[role]) {
+      return ROLE_DASHBOARDS[role]
+    }
+
+    return '/'
+  }, [])
+
+  const handlePostSignIn = useCallback(
+    async (userId) => {
+      let userProfile = await fetchProfile(userId)
+
+      if (!userProfile) {
+        await new Promise((r) => setTimeout(r, 500))
+        userProfile = await fetchProfile(userId)
+      }
+
+      if (!userProfile) return null
+
+      const selectedRole = localStorage.getItem(SELECTED_ROLE_KEY)
+
+      if (
+        !userProfile.role &&
+        !userProfile.is_active &&
+        selectedRole &&
+        (selectedRole === 'manager' || selectedRole === 'developer') &&
+        !userProfile.pending_role
+      ) {
+        const { data: updated, error } = await supabase
+          .from('users')
+          .update({ pending_role: selectedRole })
+          .eq('id', userId)
+          .select()
+          .single()
+
+        if (!error && updated) {
+          userProfile = updated
+        }
+      }
+
+      setProfile(userProfile)
+      localStorage.removeItem(SELECTED_ROLE_KEY)
+
+      const route = resolveRoute(userProfile)
+      navigate(route, { replace: true })
+
+      return userProfile
+    },
+    [fetchProfile, navigate, resolveRoute],
+  )
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession)
+      if (currentSession?.user) {
+        fetchProfile(currentSession.user.id).then((p) => {
+          setProfile(p)
+          setLoading(false)
+        })
+      } else {
+        setLoading(false)
+      }
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      setSession(newSession)
+
+      if (event === 'SIGNED_IN' && newSession?.user) {
+        setLoading(true)
+        await handlePostSignIn(newSession.user.id)
+        setLoading(false)
+      }
+
+      if (event === 'SIGNED_OUT') {
+        await leavePresence()
+        setProfile(null)
+        setLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [fetchProfile, handlePostSignIn])
+
+  const signInWithGoogle = async (selectedRole) => {
+    localStorage.setItem(SELECTED_ROLE_KEY, selectedRole)
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    })
+    if (error) throw error
+  }
+
+  const signOut = async () => {
+    await leavePresence()
+    await supabase.auth.signOut()
+    setProfile(null)
+    setSession(null)
+    navigate('/', { replace: true })
+  }
+
+  const cancelAndSignOut = async () => {
+    localStorage.removeItem(SELECTED_ROLE_KEY)
+    await signOut()
+  }
+
+  const refreshProfile = async () => {
+    if (!session?.user) return null
+    const userProfile = await fetchProfile(session.user.id)
+    setProfile(userProfile)
+    return userProfile
+  }
+
+  const value = {
+    session,
+    profile,
+    loading,
+    signInWithGoogle,
+    signOut,
+    cancelAndSignOut,
+    refreshProfile,
+    resolveRoute,
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (!context) throw new Error('useAuth must be used within AuthProvider')
+  return context
+}
