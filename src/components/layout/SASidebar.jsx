@@ -10,7 +10,7 @@ const SA_LINKS = [
   { to: '/profile', label: 'Profile', icon: User },
 ]
 
-export default function SASidebar() {
+export default function SASidebar({ onNavigate }) {
   const { profile, signOut } = useAuth()
 
   return (
@@ -26,6 +26,7 @@ export default function SASidebar() {
             key={to}
             to={to}
             end={to === '/super-admin/dashboard'}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
                 isActive

@@ -6,8 +6,7 @@ import { ROLE_DASHBOARDS, SELECTED_ROLE_KEY, supabase } from '../services/supaba
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null)
-  const [profile, setProfile] = useState(null)
+    const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 

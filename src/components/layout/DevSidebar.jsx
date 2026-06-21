@@ -8,7 +8,7 @@ const DEV_LINKS = [
   { to: '/profile', label: 'Profile', icon: User },
 ]
 
-export default function DevSidebar() {
+export default function DevSidebar({ onNavigate }) {
   const { profile, signOut } = useAuth()
 
   return (
@@ -24,6 +24,7 @@ export default function DevSidebar() {
             key={to}
             to={to}
             end={to === '/developer/dashboard'}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
                 isActive

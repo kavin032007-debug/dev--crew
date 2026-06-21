@@ -9,7 +9,7 @@ const MANAGER_LINKS = [
   { to: '/profile', label: 'Profile', icon: User },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }) {
   const { profile, signOut } = useAuth()
 
   return (
@@ -24,6 +24,7 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${
                 isActive
