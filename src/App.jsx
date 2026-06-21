@@ -12,6 +12,7 @@ import MGRProjectDetail from './pages/manager/MGRProjectDetail.jsx'
 import DEVDashboard from './pages/developer/DEVDashboard.jsx'
 import DEVMyTasks from './pages/developer/DEVMyTasks.jsx'
 import DEVTaskDetail from './pages/developer/DEVTaskDetail.jsx'
+import ProfilePage from './pages/ProfilePage.jsx'
 import ProtectedRoute from './routes/ProtectedRoute.jsx'
 import RoleRoute from './routes/RoleRoute.jsx'
 
@@ -106,6 +107,9 @@ export default function App() {
             </RoleRoute>
           }
         />
+
+        {/* Profile — accessible to all roles */}
+        <Route path="/profile" element={<ProfilePage />} />
       </Route>
     </Routes>
   )

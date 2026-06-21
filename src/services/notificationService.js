@@ -7,6 +7,26 @@ import {
 } from 'lucide-react'
 import { supabase } from './supabase'
 
+/**
+ * Calls the send-email Supabase Edge Function.
+ * Fails silently — never throws so it doesn't block the calling action.
+ *
+ * @param {string} toEmail  - recipient email address
+ * @param {string} subject  - email subject (matches notification title)
+ * @param {string} body     - plain-text body (matches notification message)
+ */
+export async function sendEmail(toEmail, subject, body) {
+  if (!toEmail) return
+  try {
+    const { error } = await supabase.functions.invoke('send-email', {
+      body: { to_email: toEmail, subject, body },
+    })
+    if (error) console.warn('[sendEmail] Edge function error:', error.message)
+  } catch (err) {
+    console.warn('[sendEmail] Failed to invoke edge function:', err)
+  }
+}
+
 export const NOTIFICATION_ICONS = {
   task_assigned: { icon: CheckSquare, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
   status_update: { icon: RefreshCw, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },

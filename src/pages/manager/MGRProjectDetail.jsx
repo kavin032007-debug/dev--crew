@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Pencil, Plus, UserMinus, UserPlus } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Pencil, Plus, Trash2, UserMinus, UserPlus } from 'lucide-react'
 import PageWrapper from '../../components/layout/PageWrapper'
 import ProjectProgressBar from '../../components/ProjectProgressBar'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { useAuth } from '../../context/AuthContext'
 import { usePresenceBroadcast } from '../../hooks/useOnlinePresence'
 import {
@@ -12,6 +13,7 @@ import {
   notifyTaskAssigned,
   todayISO,
 } from '../../services/managerService'
+import { sendEmail } from '../../services/notificationService'
 import { supabase } from '../../services/supabase'
 import {
   filterTasksByStatus,
@@ -91,6 +93,35 @@ function TaskModal({ open, onClose, onSaved, projectId, developers, task, userId
         setError(updateError.message)
         setSaving(false)
         return
+      }
+
+      // Feature 5: Notify assignee if deadline changed
+      const deadlineChanged = task.deadline !== deadline
+      const effectiveAssignee = assigneeId || task.assignee_id
+      if (deadlineChanged && effectiveAssignee) {
+        const formattedDeadline = new Date(deadline).toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric',
+        })
+        const notifTitle = 'Task deadline updated'
+        const notifMsg = `Deadline for "${title.trim()}" changed to ${formattedDeadline}`
+
+        await supabase.from('notifications').insert({
+          user_id: effectiveAssignee,
+          title: notifTitle,
+          message: notifMsg,
+          type: 'status_update',
+          related_task_id: task.id,
+        })
+
+        // Send email to assignee
+        const { data: assigneeUser } = await supabase
+          .from('users')
+          .select('email')
+          .eq('id', effectiveAssignee)
+          .single()
+        if (assigneeUser?.email) {
+          await sendEmail(assigneeUser.email, notifTitle, notifMsg)
+        }
       }
     } else {
       const { data: newTask, error: insertError } = await supabase
@@ -224,6 +255,7 @@ function TaskModal({ open, onClose, onSaved, projectId, developers, task, userId
 export default function MGRProjectDetail() {
   const { id } = useParams()
   const { profile } = useAuth()
+  const navigate = useNavigate()
   usePresenceBroadcast(profile)
 
   const [project, setProject] = useState(null)
@@ -235,6 +267,7 @@ export default function MGRProjectDetail() {
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [selectedDev, setSelectedDev] = useState('')
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false)
 
   const loadProject = useCallback(async () => {
     setLoading(true)
@@ -282,6 +315,11 @@ export default function MGRProjectDetail() {
 
   const filteredTasks = filterTasksByStatus(tasks, filter)
 
+  const handleDeleteProject = async () => {
+    await supabase.from('projects').delete().eq('id', id)
+    navigate('/manager/projects')
+  }
+
   if (loading) {
     return (
       <PageWrapper>
@@ -315,7 +353,19 @@ export default function MGRProjectDetail() {
         </Link>
 
         <div className="glass-panel p-8">
-          <h1 className="mb-2 text-2xl font-semibold text-white">{project.name}</h1>
+          <div className="mb-2 flex items-start justify-between gap-4">
+            <h1 className="text-2xl font-semibold text-white">{project.name}</h1>
+            {/* Delete button — only visible to project creator */}
+            {project.created_by === profile?.id && (
+              <button
+                onClick={() => setConfirmDeleteProject(true)}
+                className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400 transition-all hover:bg-red-500/20"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Project
+              </button>
+            )}
+          </div>
           {project.description && (
             <p className="mb-6 text-white/50">{project.description}</p>
           )}
@@ -485,6 +535,14 @@ export default function MGRProjectDetail() {
         developers={members}
         task={editingTask}
         userId={profile?.id}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDeleteProject}
+        title="Delete Project"
+        message={`Are you sure you want to delete "${project?.name}"? All tasks will be unlinked. This cannot be undone.`}
+        onConfirm={handleDeleteProject}
+        onCancel={() => setConfirmDeleteProject(false)}
       />
     </PageWrapper>
   )

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { sendEmail } from './notificationService'
 
 export async function fetchManagerProjectIds(userId) {
   const [{ data: created }, { data: memberships }] = await Promise.all([
@@ -96,6 +97,8 @@ export async function fetchActiveDevelopers() {
 
 export async function notifyTaskAssigned(assigneeId, taskTitle, taskId) {
   if (!assigneeId) return
+
+  // 1. Insert in-app notification
   await supabase.from('notifications').insert({
     user_id: assigneeId,
     title: 'New task assigned',
@@ -103,6 +106,21 @@ export async function notifyTaskAssigned(assigneeId, taskTitle, taskId) {
     type: 'task_assigned',
     related_task_id: taskId,
   })
+
+  // 2. Send email (fire-and-forget — fails silently)
+  const { data: user } = await supabase
+    .from('users')
+    .select('email')
+    .eq('id', assigneeId)
+    .single()
+
+  if (user?.email) {
+    await sendEmail(
+      user.email,
+      'New task assigned',
+      `You have been assigned a new task: ${taskTitle}`,
+    )
+  }
 }
 
 export function todayISO() {

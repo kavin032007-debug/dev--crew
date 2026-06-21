@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { FolderKanban, Plus } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { FolderKanban, Plus, Trash2 } from 'lucide-react'
 import PageWrapper from '../../components/layout/PageWrapper'
 import ProjectProgressBar from '../../components/ProjectProgressBar'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { useAuth } from '../../context/AuthContext'
 import { usePresenceBroadcast } from '../../hooks/useOnlinePresence'
 import {
@@ -106,12 +107,14 @@ function CreateProjectModal({ open, onClose, onCreated, userId }) {
 
 export default function MGRProjects() {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   usePresenceBroadcast(profile)
 
   const [projects, setProjects] = useState([])
   const [tasksMap, setTasksMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(null) // project object
 
   const loadProjects = useCallback(async () => {
     if (!profile?.id) return
@@ -127,6 +130,13 @@ export default function MGRProjects() {
     setTasksMap(map)
     setLoading(false)
   }, [profile?.id])
+
+  const handleDeleteProject = async () => {
+    if (!confirmDeleteProject) return
+    await supabase.from('projects').delete().eq('id', confirmDeleteProject.id)
+    setConfirmDeleteProject(null)
+    loadProjects()
+  }
 
   useEffect(() => {
     loadProjects()
@@ -161,18 +171,29 @@ export default function MGRProjects() {
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {projects.map((project) => (
-              <Link
-                key={project.id}
-                to={`/manager/projects/${project.id}`}
-                className="glass-panel glass-panel-hover block p-6"
-              >
-                <h3 className="mb-1 text-lg font-semibold text-white">{project.name}</h3>
-                {project.description && (
-                  <p className="mb-4 line-clamp-2 text-sm text-white/50">{project.description}</p>
+              <div key={project.id} className="glass-panel glass-panel-hover relative p-6">
+                {/* Delete button — only visible to the project creator */}
+                {project.created_by === profile?.id && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setConfirmDeleteProject(project)
+                    }}
+                    className="absolute right-4 top-4 rounded-lg border border-red-500/20 p-1.5 text-red-400/60 opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100 [.glass-panel-hover:hover_&]:opacity-100"
+                    title="Delete project"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 )}
-                <p className="mb-4 text-xs text-white/30">Created {formatDate(project.created_at)}</p>
-                <ProjectProgressBar tasks={tasksMap[project.id] || []} size="mini" />
-              </Link>
+                <Link to={`/manager/projects/${project.id}`} className="block">
+                  <h3 className="mb-1 text-lg font-semibold text-white">{project.name}</h3>
+                  {project.description && (
+                    <p className="mb-4 line-clamp-2 text-sm text-white/50">{project.description}</p>
+                  )}
+                  <p className="mb-4 text-xs text-white/30">Created {formatDate(project.created_at)}</p>
+                  <ProjectProgressBar tasks={tasksMap[project.id] || []} size="mini" />
+                </Link>
+              </div>
             ))}
           </div>
         )}
@@ -183,6 +204,14 @@ export default function MGRProjects() {
         onClose={() => setShowCreate(false)}
         onCreated={loadProjects}
         userId={profile?.id}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmDeleteProject)}
+        title="Delete Project"
+        message={`Are you sure you want to delete "${confirmDeleteProject?.name}"? All tasks will be unlinked. This cannot be undone.`}
+        onConfirm={handleDeleteProject}
+        onCancel={() => setConfirmDeleteProject(null)}
       />
     </PageWrapper>
   )

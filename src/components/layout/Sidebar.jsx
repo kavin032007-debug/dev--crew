@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { FolderKanban, LayoutDashboard } from 'lucide-react'
+import { FolderKanban, LayoutDashboard, User } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 const MANAGER_LINKS = [
   { to: '/manager/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/manager/projects', label: 'Projects', icon: FolderKanban },
+  { to: '/profile', label: 'Profile', icon: User },
 ]
 
 export default function Sidebar() {

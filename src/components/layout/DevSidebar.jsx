@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { CheckSquare, LayoutDashboard } from 'lucide-react'
+import { CheckSquare, LayoutDashboard, User } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 const DEV_LINKS = [
   { to: '/developer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/developer/tasks', label: 'My Tasks', icon: CheckSquare },
+  { to: '/profile', label: 'Profile', icon: User },
 ]
 
 export default function DevSidebar() {

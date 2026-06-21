@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { CheckSquare, Code2, LayoutDashboard, Users } from 'lucide-react'
+import { CheckSquare, Code2, LayoutDashboard, User, Users } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 const SA_LINKS = [
@@ -7,6 +7,7 @@ const SA_LINKS = [
   { to: '/super-admin/tasks', label: 'Tasks', icon: CheckSquare },
   { to: '/super-admin/managers', label: 'Managers', icon: Users },
   { to: '/super-admin/developers', label: 'Developers', icon: Code2 },
+  { to: '/profile', label: 'Profile', icon: User },
 ]
 
 export default function SASidebar() {

@@ -10,8 +10,10 @@ import {
   X,
 } from 'lucide-react'
 import SAPageWrapper from '../../components/layout/SAPageWrapper'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import { useAuth } from '../../context/AuthContext'
 import { usePresenceSubscribe } from '../../hooks/useOnlinePresence'
+import { sendEmail } from '../../services/notificationService'
 import { supabase } from '../../services/supabase'
 
 function formatDate(dateStr) {
@@ -74,6 +76,7 @@ export default function SADashboard() {
   const [pendingRequests, setPendingRequests] = useState([])
   const [loadingRequests, setLoadingRequests] = useState(true)
   const [actionId, setActionId] = useState(null)
+  const [confirmRejectUser, setConfirmRejectUser] = useState(null) // user object to reject
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true)
@@ -139,12 +142,16 @@ export default function SADashboard() {
       return
     }
 
+    const notifMsg = `Your request to join as ${user.pending_role.replace('_', ' ')} has been approved.`
     await supabase.from('notifications').insert({
       user_id: user.id,
       title: 'Request approved',
-      message: `Your request to join as ${user.pending_role.replace('_', ' ')} has been approved.`,
+      message: notifMsg,
       type: 'request_approved',
     })
+
+    // Send email notification
+    await sendEmail(user.email, 'Request approved', notifMsg)
 
     await Promise.all([fetchPendingRequests(), fetchStats(), fetchRecentSignups()])
     setActionId(null)
@@ -154,12 +161,15 @@ export default function SADashboard() {
     setActionId(user.id)
 
     if (user.pending_role) {
+      const notifMsg = `Your request to join as ${user.pending_role.replace('_', ' ')} has been rejected.`
       await supabase.from('notifications').insert({
         user_id: user.id,
         title: 'Request rejected',
-        message: `Your request to join as ${user.pending_role.replace('_', ' ')} has been rejected.`,
+        message: notifMsg,
         type: 'request_rejected',
       })
+      // Send email notification
+      await sendEmail(user.email, 'Request rejected', notifMsg)
     }
 
     const { error } = await supabase.from('users').delete().eq('id', user.id)
@@ -339,7 +349,7 @@ export default function SADashboard() {
                       </td>
                       <td className="py-4 pr-4 text-white/50">{formatDate(user.created_at)}</td>
                       <td className="py-4">
-                        <div className="flex gap-2">
+                          <div className="flex gap-2">
                           <button
                             onClick={() => handleAccept(user)}
                             disabled={actionId === user.id}
@@ -349,7 +359,7 @@ export default function SADashboard() {
                             Accept
                           </button>
                           <button
-                            onClick={() => handleReject(user)}
+                            onClick={() => setConfirmRejectUser(user)}
                             disabled={actionId === user.id}
                             className="flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition-all hover:bg-red-500/20 disabled:opacity-50"
                           >
@@ -366,6 +376,17 @@ export default function SADashboard() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmRejectUser)}
+        title="Reject Join Request"
+        message={`Are you sure you want to reject ${confirmRejectUser?.full_name || confirmRejectUser?.email}'s request? Their account will be deleted.`}
+        onConfirm={() => {
+          handleReject(confirmRejectUser)
+          setConfirmRejectUser(null)
+        }}
+        onCancel={() => setConfirmRejectUser(null)}
+      />
     </SAPageWrapper>
   )
 }
