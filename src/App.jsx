@@ -7,6 +7,7 @@ import SAManageTasks from './pages/super-admin/SAManageTasks.jsx'
 import SAManageManagers from './pages/super-admin/SAManageManagers.jsx'
 import SAManageDevelopers from './pages/super-admin/SAManageDevelopers.jsx'
 import MGRDashboard from './pages/manager/MGRDashboard.jsx'
+import MGRMyTasks from './pages/manager/MGRMyTasks.jsx'
 import MGRProjects from './pages/manager/MGRProjects.jsx'
 import MGRProjectDetail from './pages/manager/MGRProjectDetail.jsx'
 import DEVDashboard from './pages/developer/DEVDashboard.jsx'
@@ -63,6 +64,15 @@ export default function App() {
           element={
             <RoleRoute allowedRoles={['manager']}>
               <MGRDashboard />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/manager/my-tasks"
+          element={
+            <RoleRoute allowedRoles={['manager']}>
+              <MGRMyTasks />
             </RoleRoute>
           }
         />
